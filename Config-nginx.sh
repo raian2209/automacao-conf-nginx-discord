@@ -83,10 +83,10 @@ echo "INFO: Criando o arquivo de timer em $TIMER_FILE..."
 
 cat > "$TIMER_FILE" << EOF
 [Unit]
-Description=Run nginx-log.service every 5 seconds
+Description=Run nginx-log.service every 1 minute
 
 [Timer]
-OnUnitActiveSec=5s
+OnUnitActiveSec=1m
 OnBootSec=1s
 
 [Install]
