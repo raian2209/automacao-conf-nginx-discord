@@ -1,10 +1,11 @@
-
+#!/bin/bash
 
 # Este script usa inotifywait para monitorar o log de erros do Nginx
 # e envia um alerta para o Discord quando o arquivo é modificado.
 
+apt-get install inotify-tools -y
 # --- CONFIGURAÇÃO ---
-# Arquivo de log a ser monitorado. O error.log é ideal para alertas.
+# Arquivo de log a ser monitorado. O .log é ideal para alertas.
 LOG_FILE_TO_WATCH="/var/log/nginx_status.log"
 
 # A URL do Webhook é passada pelo ambiente (configurado no systemd)
