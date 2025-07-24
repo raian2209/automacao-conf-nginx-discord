@@ -17,10 +17,6 @@
 set -e
 
 # --- Passo 1: Atualizar o sistema ---
-echo "INFO: Iniciando a atualização dos pacotes do sistema..."
-sudo apt-get update -y
-sudo apt-get upgrade -y
-echo "INFO: Sistema atualizado com sucesso."
 echo "----------------------------------------------------"
 
 # --- Passo 2: Checar a existência do Nginx ---
