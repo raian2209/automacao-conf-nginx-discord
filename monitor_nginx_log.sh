@@ -2,9 +2,8 @@
 
 # Este script monitora o log de status do Nginx e envia um alerta ao Discord
 # apenas quando um código de status de erro (diferente de 2xx ou 3xx) é detectado.
+# VERSÃO CORRIGIDA (V2)
 
-# O caminho para o arquivo de log que será monitorado.
-# Este deve ser o mesmo LOG_FILE definido no seu script de configuração.
 LOG_FILE="/var/log/nginx_status.log"
 
 # Verifica se a variável de ambiente com a URL do webhook do Discord existe.
@@ -15,11 +14,13 @@ fi
 
 echo "INFO: Monitoramento do arquivo '$LOG_FILE' iniciado. Aguardando por status de erro..."
 
-# Loop infinito para monitorar o arquivo continuamente.
-while true; do
-    # Pausa o script até que o arquivo de log seja modificado.
-    # Em seguida, lê a última linha que foi adicionada.
-    LAST_LOG_LINE=$(inotifywait --quiet -e modify "$LOG_FILE" && tail -n 1 "$LOG_FILE")
+# Loop mais robusto: 'inotifywait' agora apenas controla o fluxo do loop.
+# Ele pausa o script aqui até que o arquivo seja modificado.
+while inotifywait --quiet -e modify "$LOG_FILE"; do
+    
+    # Após a modificação, lê a última linha do arquivo.
+    # Esta é a forma correta, garantindo que a variável não seja contaminada.
+    LAST_LOG_LINE=$(tail -n 1 "$LOG_FILE")
 
     # Extrai a última palavra da linha, que é o código de status HTTP.
     STATUS_CODE=$(echo "$LAST_LOG_LINE" | awk '{print $NF}')

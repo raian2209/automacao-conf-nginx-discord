@@ -31,8 +31,14 @@ if ! dpkg -s nginx &> /dev/null; then
 
     # --- Passo 3: Instalar, iniciar e habilitar o Nginx ---
     echo "INFO: Nginx não encontrado. Iniciando a instalação..."
-    
-    sudo apt-get install nginx -y  
+  
+    sudo add-apt-repository universe -y
+
+    # 2. Atualiza a lista de pacotes para incluir o novo repositório
+    sudo apt-get update
+
+    # 3. Instala ambos os pacotes
+    sudo apt-get install -y nginx inotify-tools 
     
     echo "INFO: Nginx instalado. Iniciando e habilitando o serviço..."
     # Inicia o serviço do Nginx imediatamente
