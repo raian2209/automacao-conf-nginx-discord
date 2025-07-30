@@ -5,9 +5,13 @@ cd automacao-conf-nginx-discord
 
 chmod +x *.sh
 
-sudo -E ./automat-orq.sh
+sudo ./install-nginx.sh
 
 export DISCORD_WEBHOOK_URL = "Sua_credencial_aqui"
+
+sudo -E ./automat-orq.sh
+
+
 
 sudo ./install-nginx.sh
 
