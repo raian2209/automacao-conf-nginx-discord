@@ -1,37 +1,64 @@
 #!/bin/bash
 
-# Este script usa inotifywait para monitorar o log de erros do Nginx
-# e envia um alerta para o Discord quando o arquivo é modificado.
+# Este script monitora o log de status do Nginx e envia um alerta ao Discord
+# apenas quando um código de status de erro (diferente de 2xx ou 3xx) é detectado.
 
-apt-get install inotify-tools -y
-# --- CONFIGURAÇÃO ---
-# Arquivo de log a ser monitorado. O .log é ideal para alertas.
-LOG_FILE_TO_WATCH="/var/log/nginx_status.log"
+# O caminho para o arquivo de log que será monitorado.
+# Este deve ser o mesmo LOG_FILE definido no seu script de configuração.
+LOG_FILE="/var/log/nginx_status.log"
 
-# A URL do Webhook é passada pelo ambiente (configurado no systemd)
+# Verifica se a variável de ambiente com a URL do webhook do Discord existe.
 if [ -z "$DISCORD_WEBHOOK_URL" ]; then
-    logger -t nginx_log_monitor "ERRO: A variável de ambiente DISCORD_WEBHOOK_URL não está configurada."
+    echo "ERRO: A variável de ambiente DISCORD_WEBHOOK_URL não está configurada." >&2
     exit 1
 fi
-# --- FIM DA CONFIGURAÇÃO ---
 
-echo "INFO: Iniciando o monitoramento do arquivo: $LOG_FILE_TO_WATCH" | logger -t nginx_log_monitor
+echo "INFO: Monitoramento do arquivo '$LOG_FILE' iniciado. Aguardando por status de erro..."
 
-# Loop infinito para garantir que o monitoramento continue mesmo após um evento.
-while true
-do
-    # O comando inotifywait fica bloqueado aqui até que o evento 'modify' ocorra.
-    # -e modify: Escuta apenas por eventos de modificação (escrita no arquivo).
-    # --quiet: Suprime a saída padrão do inotifywait.
-    inotifywait --quiet -e modify "$LOG_FILE_TO_WATCH"
+# Loop infinito para monitorar o arquivo continuamente.
+while true; do
+    # Pausa o script até que o arquivo de log seja modificado.
+    # Em seguida, lê a última linha que foi adicionada.
+    LAST_LOG_LINE=$(inotifywait --quiet -e modify "$LOG_FILE" && tail -n 1 "$LOG_FILE")
 
-    # Quando o comando acima é desbloqueado, significa que o arquivo mudou.
-    # Pegamos a última linha adicionada ao log para incluir no alerta.
-    LAST_LOG_LINE=$(tail -n 1 "$LOG_FILE_TO_WATCH")
+    # Extrai a última palavra da linha, que é o código de status HTTP.
+    STATUS_CODE=$(echo "$LAST_LOG_LINE" | awk '{print $NF}')
 
-    # Formata a mensagem de alerta para o Discord
-    MESSAGE="🔥 **ALERTA NO LOG DO NGINX** 🔥\n\nDetectada nova entrada no arquivo \`error.log\`.\n\n\`\`\`\n$LAST_LOG_LINE\n\`\`\`\n- **Servidor:** \`$(hostname)\`"
+    # Condição: Dispara o alerta se o código de status NÃO começar com 2 ou 3.
+    # Isso cobre erros 4xx, 5xx, e o código 000 do curl (falha de conexão).
+    if [[ ! "$STATUS_CODE" =~ ^[23]..$ ]]; then
+        
+        echo "INFO: Status de erro '$STATUS_CODE' detectado. Enviando alerta para o Discord..."
 
-    # Envia a notificação para o Discord
-    curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"$MESSAGE\"}" "$DISCORD_WEBHOOK_URL"
+        # Coleta informações adicionais para o alerta.
+        SERVER_HOSTNAME=$(hostname)
+        # Prepara a linha de log para ser enviada de forma segura em JSON.
+        SANITIZED_LOG_LINE=$(echo "$LAST_LOG_LINE" | sed 's/"/\\"/g')
+
+        # Monta a mensagem para o Discord usando o formato "Embed".
+        JSON_PAYLOAD=$(printf '{
+          "username": "Nginx Status Alert",
+          "content": "🚨 **ALERTA: O SERVIDOR NGINX RETORNOU UM ERRO** 🚨",
+          "embeds": [
+            {
+              "title": "Status HTTP Anormal Detectado",
+              "description": "O script de verificação periódica detectou que o Nginx respondeu com um código de erro, indicando um problema.",
+              "color": 15747399,
+              "fields": [
+                {
+                  "name": "Servidor",
+                  "value": "`%s`"
+                },
+                {
+                  "name": "Linha de Log Completa",
+                  "value": "```\n%s\n```"
+                }
+              ]
+            }
+          ]
+        }' "$SERVER_HOSTNAME" "$SANITIZED_LOG_LINE")
+
+        # Envia a notificação para o Discord.
+        curl --silent --show-error -X POST -H "Content-Type: application/json" -d "$JSON_PAYLOAD" "$DISCORD_WEBHOOK_URL"
+    fi
 done

@@ -44,3 +44,13 @@ EnvironmentFile=/home/ubuntu/automacao-conf-nginx-discord/monitor_nginx_log_env
 [Install]
 WantedBy=multi-user.target
 EOF
+echo "INFO: Arquivo de serviço criado com sucesso."
+echo "----------------------------------------------------"
+echo "Recarrega o systemd para reconhecer o novo serviço"
+echo "systemctl daemon-reload"
+echo "Habilita o serviço para iniciar no boot e o inicia imediatamente"
+echo "sudo systemctl enable --now nginx-log-monitor.service"
+echo "INFO: Serviço de monitoramento do Nginx configurado e iniciado com sucesso."
+echo "----------------------------------------------------"
+echo "Para verificar o status do serviço, use o comando:"
+echo "sudo systemctl status nginx-log-monitor.service"

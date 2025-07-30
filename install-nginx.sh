@@ -88,5 +88,5 @@ echo "Script Configuração Nginx finalizado."
 
 # --- Passo 6: Criar o script de monitoramento ---
 echo "INFO: Criando o script de monitoramento"
-bash ./Config-cron-nginx.sh
+bash ./Config-nginx.sh
 echo "INFO: Finalizando o script de monitoramento"

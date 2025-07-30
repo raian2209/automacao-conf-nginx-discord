@@ -10,14 +10,6 @@
 # Garante que o script pare se algum comando falhar
 set -e
 
-# --- Passo 0: Verificar se o script está sendo executado como root ---
-if [ "$(id -u)" -ne 0 ]; then
-  echo "Este script precisa ser executado como root ou com sudo." >&2
-  exit 1
-fi
-
-echo "INFO: Executando com privilégios de root. Iniciando configuração..."
-
 # --- Definir os caminhos e criar o script de monitoramento ---
 SCRIPT_PATH="/usr/local/bin/log_nginx_status.sh"
 LOG_FILE="/var/log/nginx_status.log"
