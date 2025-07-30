@@ -1,50 +1,42 @@
 #!/bin/bash
 
 # Este script monitora o log de status do Nginx e envia um alerta ao Discord
-# apenas quando um código de status de erro (diferente de 2xx ou 3xx) é detectado.
-# VERSÃO CORRIGIDA (V2)
+# apenas quando um código de status de erro é detectado.
+# VERSÃO COM ENVIO ROBUSTO DE JSON (V5)
 
 LOG_FILE="/var/log/nginx_status.log"
 
-# Verifica se a variável de ambiente com a URL do webhook do Discord existe.
 if [ -z "$DISCORD_WEBHOOK_URL" ]; then
-    echo "ERRO: A variável de ambiente DISCORD_WEBHOOK_URL não está configurada." >&2
+    logger -t nginx_smart_monitor "ERRO: A variável DISCORD_WEBHOOK_URL não está configurada."
     exit 1
 fi
 
-echo "INFO: Monitoramento do arquivo '$LOG_FILE' iniciado. Aguardando por status de erro..."
+logger -t nginx_smart_monitor "INFO: Monitoramento do arquivo '$LOG_FILE' iniciado."
 
-# Loop mais robusto: 'inotifywait' agora apenas controla o fluxo do loop.
-# Ele pausa o script aqui até que o arquivo seja modificado.
+# Pausa o script aqui até que o arquivo seja modificado.
 while inotifywait --quiet -e modify "$LOG_FILE"; do
     
-    # Após a modificação, lê a última linha do arquivo.
-    # Esta é a forma correta, garantindo que a variável não seja contaminada.
     LAST_LOG_LINE=$(tail -n 1 "$LOG_FILE")
-
-    # Extrai a última palavra da linha, que é o código de status HTTP.
     STATUS_CODE=$(echo "$LAST_LOG_LINE" | awk '{print $NF}')
 
-    # Condição: Dispara o alerta se o código de status NÃO começar com 2 ou 3.
-    # Isso cobre erros 4xx, 5xx, e o código 000 do curl (falha de conexão).
     if [[ ! "$STATUS_CODE" =~ ^[23]..$ ]]; then
         
-        echo "INFO: Status de erro '$STATUS_CODE' detectado. Enviando alerta para o Discord..."
+        logger -t nginx_smart_monitor "INFO: Status de erro '$STATUS_CODE' detectado. Preparando alerta."
 
-        # Coleta informações adicionais para o alerta.
         SERVER_HOSTNAME=$(hostname)
-        # Prepara a linha de log para ser enviada de forma segura em JSON.
-        SANITIZED_LOG_LINE=$(echo "$LAST_LOG_LINE" | sed 's/"/\\"/g')
+        
+        # Sanitização robusta para garantir que o JSON não quebre
+        SANITIZED_LOG_LINE=$(echo "$LAST_LOG_LINE" | tr -d '\n\r' | sed 's/\\/\\\\/g' | sed 's/"/\\"/g')
 
-        # Monta a mensagem para o Discord usando o formato "Embed".
+        # Monta a estrutura do JSON
         JSON_PAYLOAD=$(printf '{
           "username": "Nginx Status Alert",
           "content": "🚨 **ALERTA: O SERVIDOR NGINX RETORNOU UM ERRO** 🚨",
           "embeds": [
             {
               "title": "Status HTTP Anormal Detectado",
-              "description": "O script de verificação periódica detectou que o Nginx respondeu com um código de erro, indicando um problema.",
-              "color": 15747399,
+              "description": "O script de verificação periódica detectou que o Nginx respondeu com um código de erro.",
+              "color": 15158332,
               "fields": [
                 {
                   "name": "Servidor",
@@ -59,7 +51,16 @@ while inotifywait --quiet -e modify "$LOG_FILE"; do
           ]
         }' "$SERVER_HOSTNAME" "$SANITIZED_LOG_LINE")
 
-        # Envia a notificação para o Discord.
-        curl --silent --show-error -X POST -H "Content-Type: application/json" -d "$JSON_PAYLOAD" "$DISCORD_WEBHOOK_URL"
+        # --- ENVIO ROBUSTO E DEPURAÇÃO ---
+        
+        # 1. Registra o JSON exato que será enviado para depuração
+        logger -t nginx_smart_monitor "DEBUG: Enviando o seguinte payload JSON: $JSON_PAYLOAD"
+
+        # 2. Envia o JSON diretamente para o curl, evitando problemas com variáveis
+        RESPONSE=$(echo "$JSON_PAYLOAD" | curl --write-out "\nHTTP_STATUS:%{http_code}" -s -X POST -H "Content-Type: application/json" -d @- "$DISCORD_WEBHOOK_URL")
+        
+        # 3. Registra a resposta do Discord para depuração
+        logger -t nginx_smart_monitor "INFO: Resposta do Discord: $RESPONSE"
+        # ------------------------------------
     fi
 done
