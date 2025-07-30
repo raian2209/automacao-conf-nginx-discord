@@ -1,5 +1,10 @@
 #!/bin/bash
 
+if [ -z "$DISCORD_WEBHOOK_URL" ]; then
+    echo "ERRO: A variável de ambiente DISCORD_WEBHOOK_URL não está configurada." >&2
+    exit 1
+fi
+
 bash ./script-automas-criarsys.sh
 bash ./automat-erro.sh
 
